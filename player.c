@@ -15,6 +15,9 @@ struct addrinfo hints,*res, *tcpRes;
 struct sockaddr_in addr;
 char buffer[MAX_STR], gsport[MAX_GSPORT_SIZE], gsip[MAX_GSIP_SIZE], hostname[MAX_HOSTNAME_SIZE], plid[MAX_PLID_SIZE], wordUnderscores[MAX_WORD_SIZE*2];
 
+
+//test comment
+
 int main (int argc, char **argv) {
     char command[COMMAND_SIZE];
     CLEAN_BUFFER();
