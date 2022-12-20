@@ -1,2 +1,2 @@
 detector null
-QUIT
+WIN

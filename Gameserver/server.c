@@ -67,9 +67,9 @@ int main(int argc, char** argv){
 
         select(maxfd, &copy, NULL, NULL, NULL);
 
-        char command[COMMAND_SIZE];
-        char request[REQUEST_SIZE];
         if(FD_ISSET(udpfd, &copy)) {
+            char command[COMMAND_SIZE];
+            char request[REQUEST_SIZE];
 
             RECEIVE(request, REQUEST_SIZE);
 
@@ -88,18 +88,25 @@ int main(int argc, char** argv){
         }
         else if (FD_ISSET(tcpfd, &copy)) {
             pid_t childpid;
-            connfd = accept(tcpfd, (struct sockaddr *) &cliaddr, (socklen_t *) sizeof(cliaddr));
-            childpid = fork();
-            read(tcpfd, request, REQUEST_SIZE);
+            char command[COMMAND_SIZE];
+            char request[REQUEST_SIZE];
+            
+            socklen_t addr_size = sizeof(addr);
+            connfd = accept(tcpfd, (struct sockaddr *) &addr, &addr_size);
+            read(connfd, request, REQUEST_SIZE);
 
             strncpy(command, request, COMMAND_SIZE);
             command[COMMAND_SIZE-1] = '\0';
+
+            childpid = fork();
             if (childpid == 0) {
                 switch(hash(command)) {
                     case(REQUEST_GSB): gsb(); break;
                     case(REQUEST_GHL): ghl(request+COMMAND_SIZE); break;
                     case(REQUEST_STA): sta(request+COMMAND_SIZE); break;
                 }
+                close(connfd);
+                exit(0);
             }
         }
     }
@@ -277,13 +284,14 @@ void rev(char *args) {
 }
 
 void gsb() {
-    char buffer[MAX_STR];
+    char buffer[MAX_STR], line[MAX_STR], SCOREBOARD_PATH[MAX_STR];
     
-    printf("In fork!!!!\n");
+    sprintf(SCOREBOARD_PATH, "%s/scoreboard.txt", GAMES_DIRECTORY);
 
-    sprintf(buffer, "Successfully established!\n");
+    // Create scoreboard file
+    FILE* scoreboard = fopen(SCOREBOARD_PATH, "w");    
 
-    write(tcpfd, buffer, MAX_STR);
+    write(connfd, buffer, MAX_STR);
 }
 
 void ghl(char *args) {
@@ -311,7 +319,7 @@ void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, 
         }
         else if(line[0] == 'G') {
             char fileGuess[MAX_STR];
-            sscanf(line, "T %s\n", fileGuess);
+            sscanf(line, "G %s\n", fileGuess);
             if(strcasecmp(fileGuess, wordGuessed) == 0) {
                 *stat = DUP;
                 return;
@@ -435,7 +443,51 @@ void endGame(char* gamePath, int *stat) {
 
     sprintf(dest, "%s/%d%02d%02d_%02d%02d%02d_%c.txt", dir, 1900+t->tm_year, 1+t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, mode[0]);
 
+    if(*stat == WIN)
+        createScore(gamePath, plid);
+
     rename(gamePath, dest);
+}
+
+void createScore(char* gamePath, char* plid) {
+    char line[MAX_STR], word[MAX_WORD_SIZE], wordGuessed[MAX_WORD_SIZE];
+    int userTrial = 1, fileTrial = 1, fileErrors = 0;
+    void* ptr = NULL;
+
+    FILE* game = fopen(gamePath, "r");
+    fscanf(game, "%s %s\n", word, wordGuessed);
+    while((ptr = fgets(line, sizeof(line), game))) {
+        if(line[0] == 'T') {
+            int guessed;
+            sscanf(line, "T %*c %d\n", &guessed);
+            if (guessed == 0) fileErrors++;
+        }
+        else if(line[0] == 'G') {
+            fileErrors++;
+        }
+        fileTrial++;
+    }
+    fclose(game);
+
+    int score = 100*(fileTrial - fileErrors) / fileTrial;
+
+    char content[MAX_STR], scorePath[MAX_STR];
+
+    sprintf(content, "%d %s %d %d %s\n", score, plid, (fileTrial - fileErrors)-1, fileTrial-1, word);
+
+
+    time_t rawtime = time(NULL);
+    struct tm *t;
+    
+    t = localtime(&rawtime);
+
+    sprintf(scorePath, "./SCORES/%03d_%s_%d%02d%02d_%02d%02d%02d.txt", score, plid, 1900+t->tm_year, 1+t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+
+    FILE* scoreFile = fopen(scorePath, "w");
+
+    fprintf(scoreFile, "%s", content);
+
+    fclose(scoreFile);
 }
 
 void stringToUpper(char* arg) {

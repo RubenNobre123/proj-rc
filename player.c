@@ -163,9 +163,9 @@ void scoreboard() {
 
     write(tcpfd, message, strlen(message));
 
+    printf("Waiting for read...\n");
     read(tcpfd, buffer, MAX_STR);
-
-    memset(buffer, '\0', sizeof(buffer));
+    printf("Read!\n");
 
     printf("%s\n", buffer);
 
