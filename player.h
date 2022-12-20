@@ -1,4 +1,5 @@
 #define PORT "58001"
+#define HOSTNAME NULL
 #define MAX_STR 256
 
 // Relevant application-related constants

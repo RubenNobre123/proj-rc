@@ -287,14 +287,60 @@ void rev(char *args) {
 }
 
 void gsb() {
-    char buffer[MAX_STR], line[MAX_STR], SCOREBOARD_PATH[MAX_STR];
+    char buffer[MAX_STR], line[MAX_STR],  fName[MAX_FILENAME_SIZE], scoresDir[MAX_STR];
+    enum status stat;
     
-    sprintf(SCOREBOARD_PATH, "%s/scoreboard.txt", GAMES_DIRECTORY);
+    sprintf(scoresDir, "./SCORES/");
 
-    // Create scoreboard file
-    FILE* scoreboard = fopen(SCOREBOARD_PATH, "w");    
+    DIR* dir = opendir(scoresDir);
+    // Start reading scoreDir and count how many files are in it
+    struct dirent* entry;
+    int nFiles = 0;
+    while((entry = readdir(dir))) {
+        if(entry->d_type == DT_REG) {
+            nFiles++;
+        }
+    }
+    closedir(dir);
+
+    stat = nFiles == 0 ? EMPTY : OK;
+
+    printf("created\n");
+    createScoreboard(fName, nFiles);
+
 
     write(connfd, buffer, MAX_STR);
+}
+
+void createScoreboard(char* fName, int nFiles) {
+    char scoreboardPath[MAX_STR], fname[MAX_STR*2];
+    struct dirent **entries;
+    FILE* fp;
+    int n_entries;
+
+    sprintf(fName, "scoreboard.txt");
+
+    sprintf(scoreboardPath, "%s/%s", GAMES_DIRECTORY, fName);
+
+    // Create scoreboard file
+    FILE* scoreboard = fopen(scoreboardPath, "w");
+
+    n_entries = scandir("./SCORES/", &entries, NULL, alphasort);
+    if(n_entries < 0) return;
+    while (n_entries--) {
+        if(entries[n_entries]->d_name[0] != '.') {
+            sprintf(fname, "SCORES/%s", entries[n_entries]->d_name);
+            fp = fopen(fname, "r");
+            if(fp) {
+                char plid[MAX_PLID_SIZE], word[MAX_WORD_SIZE];
+                int score, rights, total;
+                fscanf(fp, "%d %s %d %d %s\n", &score, plid, &rights, &total, word);
+                fprintf(scoreboard, "%d %s %d %d %s\n", score, plid, rights, total, word);
+            }
+            fclose(fp);
+        }
+    }
+    fclose(scoreboard);
 }
 
 void ghl(char *args) {
@@ -459,18 +505,23 @@ void createScore(char* gamePath, char* plid) {
 
     FILE* game = fopen(gamePath, "r");
     fscanf(game, "%s %s\n", word, wordGuessed);
+    int wasGuess = 1;
     while((ptr = fgets(line, sizeof(line), game))) {
+
         if(line[0] == 'T') {
             int guessed;
             sscanf(line, "T %*c %d\n", &guessed);
             if (guessed == 0) fileErrors++;
+            wasGuess = 0;
             fileTrial++;
         }
         else if(line[0] == 'G') {
+            wasGuess = 1;
             fileErrors++;
             fileTrial++;
         }
     }
+    if(wasGuess) fileErrors--;
     fclose(game);
 
     int score = 100*(fileTrial - fileErrors) / fileTrial;
@@ -478,7 +529,6 @@ void createScore(char* gamePath, char* plid) {
     char content[MAX_STR], scorePath[MAX_STR];
 
     sprintf(content, "%d %s %d %d %s\n", score, plid, (fileTrial - fileErrors)-1, fileTrial-1, word);
-
 
     time_t rawtime = time(NULL);
     struct tm *t;
@@ -527,7 +577,7 @@ void init(int argc, char** argv) {
 }
 
 char* statusToString(enum status s) {
-    char *strings[] = { "NOK", "OK", "ERR", "WIN", "DUP", "OVR", "INV", "QUT" };
+    char *strings[] = { "NOK", "OK", "ERR", "WIN", "DUP", "OVR", "INV", "QUT", "EMPTY" };
 
     return strings[s];
 }

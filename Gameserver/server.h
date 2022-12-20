@@ -8,6 +8,7 @@
 #define REQUEST_SIZE 50
 #define MAX_PLID_SIZE 7
 #define MAX_WORD_SIZE 31
+#define MAX_FILENAME_SIZE 25
 #define MAX_HOSTNAME_SIZE 100
 
 // Request hashes
@@ -41,7 +42,8 @@ enum status {
     DUP,
     OVR,
     INV,
-    QUT
+    QUT,
+    EMPTY
 };
 
 void init(int argc, char** argv);
@@ -54,6 +56,7 @@ void endGame(char* gamePath, int *stat);
 int playLetter(char* gamePath, char letter, int userTrial, char* content, int* stat, int* positions) ;
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);
+void createScoreboard(char* fName, int nFiles);
 void sng(char* plid); 
 void plg(char* args); 
 void pwg(char* args);

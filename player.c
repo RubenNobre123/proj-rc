@@ -30,18 +30,7 @@ int main (int argc, char **argv) {
     hints.ai_family=AF_INET; //IPv4
     hints.ai_socktype=SOCK_DGRAM;
 
-    errcode = getaddrinfo("localhost", PORT, &hints, &res);
-    if(errcode!=0)/*error*/exit(1);
-
-    
-    tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
-    if (tcpfd==-1) exit(1); //error
-
-    memset(&hints,0,sizeof hints);
-    hints.ai_family=AF_INET; //IPv4
-    hints.ai_socktype=SOCK_STREAM;
-
-    errcode = getaddrinfo("localhost", PORT, &hints, &tcpRes);
+    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &res);
     if(errcode!=0)/*error*/exit(1);
 
     while(1) {
@@ -99,6 +88,7 @@ void start_game() {
     SEND(message, strlen(message));
 
     RECEIVE(buffer, MAX_STR);
+
     trial = 1;
     char status[2];
     sscanf(buffer, "%*s %s", status);
@@ -159,16 +149,26 @@ void scoreboard() {
 
     sprintf(message, "GSB\n");
 
+    tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
+    if (tcpfd==-1) exit(1); //error
+
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET; //IPv4
+    hints.ai_socktype=SOCK_STREAM;
+
+    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    if(errcode!=0)/*error*/exit(1);
+
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
 
     write(tcpfd, message, strlen(message));
 
     printf("Waiting for read...\n");
+    memset(buffer, '\0', MAX_STR);
     read(tcpfd, buffer, MAX_STR);
-    printf("Read!\n");
-
     printf("%s\n", buffer);
-
+    printf("Read!\n");
+    
     close(tcpfd);
 }
 

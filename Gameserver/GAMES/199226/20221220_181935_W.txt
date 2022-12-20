@@ -1,0 +1,4 @@
+expectation null
+T a 1
+G expectation
+WIN
