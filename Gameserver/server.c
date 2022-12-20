@@ -184,8 +184,11 @@ void plg(char* args) {
 
         found = playLetter(path, letter, trial, content, (int*) &stat, positions);
 
+        // Check if game is over
         if (!(stat == INV || stat == DUP))
             writeToUserFile(path, content);
+        if(stat == WIN || stat == OVR)
+            endGame(path, (int*) &stat);
     }
     else
         stat = ERR;
@@ -217,11 +220,11 @@ void pwg(char* args) {
         
         guessWord(path, word, trial, content, (int*) &stat);
 
-            // Check if game is over
+        // Check if game is over
+        if (!(stat == INV || stat == DUP))
+            writeToUserFile(path, content);
         if(stat == WIN || stat == OVR)
             endGame(path, (int*) &stat);
-        else if (!(stat == INV || stat == DUP))
-            writeToUserFile(path, content);
     }
     else
         stat = ERR;
@@ -461,11 +464,12 @@ void createScore(char* gamePath, char* plid) {
             int guessed;
             sscanf(line, "T %*c %d\n", &guessed);
             if (guessed == 0) fileErrors++;
+            fileTrial++;
         }
         else if(line[0] == 'G') {
             fileErrors++;
+            fileTrial++;
         }
-        fileTrial++;
     }
     fclose(game);
 
