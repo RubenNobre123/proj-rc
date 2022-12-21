@@ -193,14 +193,22 @@ void receiveScoreboard() {
     int toWrite = sbSize;
     FILE* sb = fopen(sbName, "w");
 
+    printf("%s", buffer+bytesRead);
     toWrite-=fprintf(sb, "%s", buffer+bytesRead);
-    while(toWrite > 0) {        
+    while(toWrite-MAX_STR > 0) {        
         if(read(tcpfd, buffer, MAX_STR) > 0) {
+            printf("%s", buffer);
             toWrite -= fprintf(sb, "%s", buffer);
             memset(buffer, '\0', MAX_STR);
         }
     }
 
+    if(read(tcpfd, buffer, toWrite) > 0) {
+        printf("%s", buffer);
+        toWrite -= fprintf(sb, "%s", buffer);
+        memset(buffer, '\0', MAX_STR);
+    }
+    
     printf("File %s created with size %d\n", sbName, sbSize);
 
     fclose(sb);
@@ -209,7 +217,7 @@ void receiveScoreboard() {
 void hint() {
     char message[MAX_STR], status[10];
 
-    sprintf(message, "GHL\n");
+    sprintf(message, "GHL %s\n", plid);
 
     tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
     if (tcpfd==-1) exit(1); //error
@@ -228,7 +236,6 @@ void hint() {
     read(tcpfd, buffer, MAX_STR);
 
     sscanf(buffer, "RHL %s", status);
-    printf("%s", buffer);
 
     switch(getStatus(status)) {
         case(NOK):
@@ -247,15 +254,24 @@ void hint() {
 
 void receiveFile() {
     char fileName[MAX_FILENAME_SIZE], line[MAX_STR];
-    int fileSize;
+    int fileSize, bytesRead, offset;
     
-    read(tcpfd, buffer, MAX_STR);
-    sscanf(buffer, "%s %d %s", fileName, &fileSize, line);
-    FILE* sb = fopen(fileName, "w");
-    fprintf(sb, "%s", line);
-    
-    while(read(tcpfd, buffer, MAX_STR) > 0) {
-        fprintf(sb, "%s", buffer);
+    bytesRead = read(tcpfd, buffer, MAX_STR);
+
+    sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
+
+    printf("%s %d\n", fileName, fileSize);
+
+    int toWrite = fileSize;
+    FILE* sb = fopen(fileName, "wb");
+
+    toWrite-=fwrite(buffer+offset, 1, bytesRead-offset, sb);
+
+    while(toWrite > 0) {
+        if((bytesRead = read(tcpfd, buffer, MAX_STR)) > 0) {
+            toWrite -= fwrite(buffer, 1, bytesRead, sb);
+            memset(buffer, '\0', MAX_STR);
+        }
     }
 
     printf("File %s created with size %d\n", fileName, fileSize);

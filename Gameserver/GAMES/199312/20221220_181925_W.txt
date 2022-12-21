@@ -1,3 +1,0 @@
-professor null
-G professor
-WIN

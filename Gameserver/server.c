@@ -368,7 +368,41 @@ int createScoreboard(char* scoreboardPath, int nFiles) {
 }
 
 void ghl(char *args) {
-    return;
+    char buffer[MAX_STR], path[MAX_STR], image[MAX_FILENAME_SIZE], line[50], scoresDir[MAX_STR], reply[MAX_STR*2], plid[MAX_PLID_SIZE];
+    enum status stat;
+    
+    // Falta verificar se o plid é válido
+    strncpy(plid, args, MAX_PLID_SIZE-1);
+    plid[MAX_PLID_SIZE-1] = '\0';
+    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+
+    if(fileExists(path)) {
+        FILE* game = fopen(path, "r");
+
+        fscanf(game, "%*s %s\n", image);
+        fclose(game);
+
+        stat = OK;
+    }
+    else stat = NOK;
+
+    sprintf(reply, "RHL %s", statusToString(stat));
+    write(connfd, reply, MAX_STR);
+
+    if(stat==OK) {
+        FILE* sb = fopen(image, "r");
+
+        fgets(line, MAX_STR, sb);
+        sprintf(reply, "%s %d\n%s", "scoreboard.txt", bytes, line);
+        write(connfd, reply, MAX_STR);
+
+        while(fgets(line, MAX_STR, sb)) {
+            write(connfd, line, MAX_STR);
+        }
+
+        fclose(sb);
+
+    SEND(reply);
 }
 
 void sta(char *args) {

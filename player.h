@@ -1,5 +1,5 @@
-#define PORT "58001"
-#define HOSTNAME NULL
+#define PORT "58011"
+#define HOSTNAME "tejo.tecnico.ulisboa.pt"
 #define MAX_STR 256
 
 // Relevant application-related constants
