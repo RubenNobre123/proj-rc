@@ -26,6 +26,7 @@ int main(int argc, char** argv){
     char request[REQUEST_SIZE];
     init(argc, argv);
 
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family=AF_INET;//IPv4
     hints.ai_socktype=SOCK_STREAM;//TCP socket
@@ -36,9 +37,12 @@ int main(int argc, char** argv){
     /* create listening TCP socket */
     tcpfd = socket(AF_INET, SOCK_STREAM, 0);
     const int enable = 1;
-    setsockopt(udpfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
+    setsockopt(tcpfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
     n = bind(tcpfd, res->ai_addr,res->ai_addrlen);
-    if(n==-1) exit(1);
+    if(n==-1) {
+        printf("%s\n", strerror(errno));
+        exit(1);
+    }
 
     listen(tcpfd, 20);
 
@@ -106,8 +110,11 @@ int main(int argc, char** argv){
                     case(REQUEST_STA): sta(request+COMMAND_SIZE); break;
                 }
                 close(connfd);
+                close(tcpfd);
+                close(udpfd);
                 exit(0);
             }
+            close(connfd);
         }
     }
 }
@@ -287,7 +294,7 @@ void rev(char *args) {
 }
 
 void gsb() {
-    char buffer[MAX_STR], line[MAX_STR],  fName[MAX_FILENAME_SIZE], scoresDir[MAX_STR];
+    char buffer[MAX_STR], scoreboardPath[MAX_STR], line[50], scoresDir[MAX_STR], reply[MAX_STR*2];
     enum status stat;
     
     sprintf(scoresDir, "./SCORES/");
@@ -305,28 +312,44 @@ void gsb() {
 
     stat = nFiles == 0 ? EMPTY : OK;
 
-    printf("created\n");
-    createScoreboard(fName, nFiles);
+    int bytes = createScoreboard(scoreboardPath, nFiles);
 
+    sprintf(reply, "RSB %s", statusToString(stat));
+    write(connfd, reply, MAX_STR);
 
-    write(connfd, buffer, MAX_STR);
+    if(stat==OK) {
+        FILE* sb = fopen(scoreboardPath, "r");
+
+        fgets(line, MAX_STR, sb);
+        sprintf(reply, "%s %d\n%s", "scoreboard.txt", bytes, line);
+        write(connfd, reply, MAX_STR);
+
+        while(fgets(line, MAX_STR, sb)) {
+            write(connfd, line, MAX_STR);
+        }
+
+        fclose(sb);
+    }
+    else {
+        strcat(reply, "\n");
+        write(connfd, reply, MAX_STR);
+    }
 }
 
-void createScoreboard(char* fName, int nFiles) {
-    char scoreboardPath[MAX_STR], fname[MAX_STR*2];
+int createScoreboard(char* scoreboardPath, int nFiles) {
+    char fname[MAX_STR*2];
+    int written = 0;
     struct dirent **entries;
     FILE* fp;
     int n_entries;
 
-    sprintf(fName, "scoreboard.txt");
-
-    sprintf(scoreboardPath, "%s/%s", GAMES_DIRECTORY, fName);
+    sprintf(scoreboardPath, "%s/scoreboard.txt", GAMES_DIRECTORY);
 
     // Create scoreboard file
     FILE* scoreboard = fopen(scoreboardPath, "w");
 
     n_entries = scandir("./SCORES/", &entries, NULL, alphasort);
-    if(n_entries < 0) return;
+    if(n_entries < 0) return 0;
     while (n_entries--) {
         if(entries[n_entries]->d_name[0] != '.') {
             sprintf(fname, "SCORES/%s", entries[n_entries]->d_name);
@@ -335,12 +358,13 @@ void createScoreboard(char* fName, int nFiles) {
                 char plid[MAX_PLID_SIZE], word[MAX_WORD_SIZE];
                 int score, rights, total;
                 fscanf(fp, "%d %s %d %d %s\n", &score, plid, &rights, &total, word);
-                fprintf(scoreboard, "%d %s %d %d %s\n", score, plid, rights, total, word);
+                written += fprintf(scoreboard, "%d %s %d %d %s\n", score, plid, rights, total, word);
             }
             fclose(fp);
         }
     }
     fclose(scoreboard);
+    return written;
 }
 
 void ghl(char *args) {

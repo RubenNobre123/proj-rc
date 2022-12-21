@@ -56,7 +56,7 @@ void endGame(char* gamePath, int *stat);
 int playLetter(char* gamePath, char letter, int userTrial, char* content, int* stat, int* positions) ;
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);
-void createScoreboard(char* fName, int nFiles);
+int createScoreboard(char* scoreboardPath, int nFiles);
 void sng(char* plid); 
 void plg(char* args); 
 void pwg(char* args);

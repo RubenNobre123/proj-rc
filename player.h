@@ -9,6 +9,7 @@
 #define REQUEST_SIZE 50
 #define MAX_PLID_SIZE 7
 #define MAX_HOSTNAME_SIZE 100
+#define MAX_FILENAME_SIZE 25
 #define MAX_WORD_SIZE 31
 
 // Command hashes
@@ -41,7 +42,9 @@ enum status {
     WIN,
     DUP,
     OVR,
-    INV
+    INV,
+    QUT,
+    EMPTY
 };
 
 // Auxiliary functions
@@ -49,6 +52,8 @@ void correctGuess(char *token, char letter);
 enum status getStatus(char* status);
 void init(int argc, char **argv);
 int hash(char* arg);
+void receiveScoreboard();
+void receiveFile();
 
 // Command-handling functions
 void start_game();

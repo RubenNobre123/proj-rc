@@ -1,0 +1,2 @@
+detector null
+T a 0

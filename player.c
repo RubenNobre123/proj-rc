@@ -145,7 +145,7 @@ void play() {
 }
 
 void scoreboard() {
-    char message[MAX_STR];
+    char message[MAX_STR], status[10];
 
     sprintf(message, "GSB\n");
 
@@ -163,17 +163,104 @@ void scoreboard() {
 
     write(tcpfd, message, strlen(message));
 
-    printf("Waiting for read...\n");
-    memset(buffer, '\0', MAX_STR);
     read(tcpfd, buffer, MAX_STR);
-    printf("%s\n", buffer);
-    printf("Read!\n");
-    
+
+    sscanf(buffer, "RSB %s", status);
+
+    switch(getStatus(status)) {
+        case(EMPTY):
+            printf("No games have been played! No scoreboard available.\n");
+            break;
+        case(OK):
+            receiveScoreboard();
+            break;
+        default:
+            printf("Unknown error ocurred.");
+            break;
+    }
+
     close(tcpfd);
 }
 
+void receiveScoreboard() {
+    char sbName[MAX_FILENAME_SIZE], line[MAX_STR];
+    int sbSize;
+    
+    read(tcpfd, buffer, MAX_STR);
+    int bytesRead;
+    sscanf(buffer, "%s %d\n%n", sbName, &sbSize, &bytesRead);
+    
+    int toWrite = sbSize;
+    FILE* sb = fopen(sbName, "w");
+
+    toWrite-=fprintf(sb, "%s", buffer+bytesRead);
+    while(toWrite > 0) {        
+        if(read(tcpfd, buffer, MAX_STR) > 0) {
+            toWrite -= fprintf(sb, "%s", buffer);
+            memset(buffer, '\0', MAX_STR);
+        }
+    }
+
+    printf("File %s created with size %d\n", sbName, sbSize);
+
+    fclose(sb);
+}
+
 void hint() {
-    return;
+    char message[MAX_STR], status[10];
+
+    sprintf(message, "GHL\n");
+
+    tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
+    if (tcpfd==-1) exit(1); //error
+
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET; //IPv4
+    hints.ai_socktype=SOCK_STREAM;
+
+    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    if(errcode!=0)/*error*/exit(1);
+
+    connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
+
+    write(tcpfd, message, strlen(message));
+
+    read(tcpfd, buffer, MAX_STR);
+
+    sscanf(buffer, "RHL %s", status);
+    printf("%s", buffer);
+
+    switch(getStatus(status)) {
+        case(NOK):
+            printf("No file available for this word!\n");
+            break;
+        case(OK):
+            receiveFile();
+            break;
+        default:
+            printf("Unknown error ocurred.");
+            break;
+    }
+
+    close(tcpfd);
+}
+
+void receiveFile() {
+    char fileName[MAX_FILENAME_SIZE], line[MAX_STR];
+    int fileSize;
+    
+    read(tcpfd, buffer, MAX_STR);
+    sscanf(buffer, "%s %d %s", fileName, &fileSize, line);
+    FILE* sb = fopen(fileName, "w");
+    fprintf(sb, "%s", line);
+    
+    while(read(tcpfd, buffer, MAX_STR) > 0) {
+        fprintf(sb, "%s", buffer);
+    }
+
+    printf("File %s created with size %d\n", fileName, fileSize);
+
+    fclose(sb);
 }
 
 void state() {
@@ -299,6 +386,8 @@ enum status getStatus(char* status) {
     if (strcmp(status, "DUP") == 0) { return DUP; }  
     if (strcmp(status, "OVR") == 0) { return OVR; }  
     if (strcmp(status, "INV") == 0) { return INV; }  
+    if (strcmp(status, "QUT") == 0) { return QUT; }
+    if (strcmp(status, "EMPTY") == 0) { return EMPTY; }
 }
 
 // djb2 hashing method for simplicity and switch case
