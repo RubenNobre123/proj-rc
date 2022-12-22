@@ -1,0 +1,7 @@
+Active game for player 719741 found:
+--------------------------------
+	 0 - 	LETTER:	a	FOUND:	5	
+	 1 - 	LETTER:	b	FOUND:	2	
+	 2 - 	LETTER:	r	FOUND:	2	
+	 3 - 	WORD:	banana	FAIL	
+--------------------------------

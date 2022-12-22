@@ -1,0 +1,9 @@
+Active game for player 811928 found:
+--------------------------------
+	 0 - 	LETTER:	b	FOUND:	1	
+	 1 - 	LETTER:	r	FOUND:	2	
+	 2 - 	LETTER:	a	FOUND:	3	
+	 3 - 	LETTER:	m	FOUND:	0	
+	 4 - 	LETTER:	p	FOUND:	0	
+	 5 - 	WORD:	bbbb	FAIL	
+--------------------------------

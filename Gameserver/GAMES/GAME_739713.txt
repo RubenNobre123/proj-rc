@@ -1,0 +1,9 @@
+abracadabra witch.jpg
+T a 5
+T b 2
+T r 2
+T c 1
+T z 0
+T t 0
+T m 0
+G mario

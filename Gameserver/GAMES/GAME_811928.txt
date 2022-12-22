@@ -1,0 +1,7 @@
+barracuda esox_sphyraena.jpg
+T b 1
+T r 2
+T a 3
+T m 0
+T p 0
+G bbbb

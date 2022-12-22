@@ -1,6 +1,9 @@
-#define PORT "58011"
-#define HOSTNAME "tejo.tecnico.ulisboa.pt"
+#define PORT "58001"
+#define HOSTNAME NULL
 #define MAX_STR 256
+
+#define TIMEOUT_SEC 1
+#define TIMEOUT_ENABLED 0
 
 // Relevant application-related constants
 #define MAX_GSPORT_SIZE 6
@@ -50,22 +53,25 @@ enum status {
 };
 
 // Auxiliary functions
-void correctGuess(char *token, char letter);
+void correctGuess(char *token, char letter, enum status stat);
 enum status getStatus(char* status);
 void init(int argc, char **argv);
 int hash(char* arg);
 void receiveScoreboard();
 void receiveFile();
-void displayCurrentInformation();
-void displayMostRecent();
+void receiveAndDisplay();
 
 // Command-handling functions
 void start_game();
 void play();
 void guess_word();
-int quit_game();
+void quit_game();
 void exit_game();
 void reveal();
 void scoreboard();
 void hint();
 void state();
+
+// Communication functions
+int receiveUDP();
+int receiveTCP(int amount, int *amountRead);

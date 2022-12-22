@@ -1,0 +1,8 @@
+abracadabra witch.jpg
+T a 5
+T b 2
+T t 0
+G matumbo
+T r 2
+G abracadabra
+WIN

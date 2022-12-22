@@ -20,7 +20,7 @@
 #define REQUEST_RWG 193469237
 #define REQUEST_GSB 193457121
 #define REQUEST_GHL 193456768
-#define REQUEST_STA 193506157
+#define REQUEST_STA 193470221
 #define REQUEST_QUT 193468095
 #define REQUEST_RQT 193469052
 #define REQUEST_RRV 193469087
@@ -43,7 +43,9 @@ enum status {
     OVR,
     INV,
     QUT,
-    EMPTY
+    EMPTY,
+    ACT,
+    FIN
 };
 
 void init(int argc, char** argv);
@@ -52,12 +54,15 @@ void writeToUserFile(char* path, char* content);
 void stringToUpper(char* arg);
 char* statusToString(enum status s);
 int fileExists(char* path);
+int ongoingGame(char *path);
 void endGame(char* gamePath, int *stat);
 int playLetter(char* gamePath, char letter, int userTrial, char* content, int* stat, int* positions) ;
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);
 int createScoreboard(char* scoreboardPath, int nFiles);
 long getFileSize(char* file);
+long createStateFile(char* path, char* statePath, char* plid, char* buffer, enum status stat);
+int findLastGame(char* PLID, char* fname);
 void sng(char* plid); 
 void plg(char* args); 
 void pwg(char* args);

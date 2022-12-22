@@ -50,7 +50,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Gameserver/GS",
             "args": [
-                "words"
+                "word_eng.txt"
             ],
             "stopAtEntry": true,
             "cwd": "${fileDirname}",

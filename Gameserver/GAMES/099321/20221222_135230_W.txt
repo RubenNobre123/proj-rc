@@ -1,0 +1,8 @@
+barracuda esox_sphyraena.jpg
+T a 3
+T b 1
+T r 2
+T c 1
+G matumbo
+G barracuda
+WIN

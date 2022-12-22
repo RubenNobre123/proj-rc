@@ -68,8 +68,8 @@ int main (int argc, char **argv) {
                 quit_game();
                 break;
             case(COMMAND_EXIT):
-                if(quit_game() == 0) return 0;
-                else break;
+                quit_game();
+                break;
             default:
                 printf("Error!\n");
                 break;
@@ -88,11 +88,12 @@ void start_game() {
 
     SEND(message, offset);
 
-    RECEIVE(buffer, MAX_STR);
+    if(receiveUDP(buffer) == -1)
+        return;
 
     trial = 1;
     char status[2];
-    sscanf(buffer, "%*s %s", status);
+    sscanf(buffer, "%*s %s%n", status, &offset);
 
     if (strcmp(status, "NOK") == 0)
     {
@@ -100,7 +101,7 @@ void start_game() {
     }
     else
     {
-        sscanf(buffer, "%*s %*s %d %d", &num_errors, &num_letters);
+        sscanf(buffer+offset, " %d %d", &num_letters, &num_errors);
         for(int i = 0; i < num_letters*2; i+=2) { wordUnderscores[i] = '_'; wordUnderscores[i+1] = ' '; }
         wordUnderscores[num_letters*2-1] = '\0';
         printf("New game started. Guess %d letter word: %s\n", num_letters, wordUnderscores);
@@ -115,12 +116,12 @@ void play() {
     scanf(" %c", &letter);
 
     offset = sprintf(message, "PLG %s %c %d\n", plid, letter, trial);
-    printf("%s", message);
 
     SEND(message, offset);
 
-    RECEIVE(buffer, MAX_STR);
-    printf("%s", buffer);
+    memset(buffer, '\0', MAX_STR);
+    if(receiveUDP(buffer) == -1)
+        return;
 
     token = strtok(buffer, " ");
     // fetch status
@@ -129,7 +130,7 @@ void play() {
     switch(stat) {
         case(OK):
         case(WIN):
-            correctGuess(token, letter);
+            correctGuess(token, letter, stat);
             trial++;
             break;
         case(DUP):
@@ -170,7 +171,8 @@ void scoreboard() {
 
     write(tcpfd, message, offset);
 
-    read(tcpfd, buffer, MAX_STR);
+    if(receiveTCP(8, NULL) == -1)
+        return;
 
     sscanf(buffer, "RSB %s", status);
 
@@ -193,7 +195,8 @@ void receiveScoreboard() {
     char sbName[MAX_FILENAME_SIZE], line[MAX_STR];
     int sbSize, bytesRead, offset;
     
-    bytesRead = read(tcpfd, buffer, MAX_STR);
+    if(receiveTCP(MAX_STR, &bytesRead)==-1)
+        return;
     sscanf(buffer, "%s %d\n%n", sbName, &sbSize, &offset);
     
     int toWrite = sbSize;
@@ -232,9 +235,10 @@ void hint() {
 
     write(tcpfd, message, offset);
 
-    read(tcpfd, buffer, MAX_STR);
+    if(receiveTCP(8, NULL) == -1)
+        return;
 
-    sscanf(buffer, "RHL %s", status);
+    sscanf(buffer, "RHL %s ", status);
 
     switch(getStatus(status)) {
         case(NOK):
@@ -297,16 +301,14 @@ void state() {
     write(tcpfd, message, offset);
 
     memset(buffer, '\0', MAX_STR);
-    read(tcpfd, buffer, MAX_STR);
+    read(tcpfd, buffer, 8);
 
     sscanf(buffer, "RST %s", status);
 
     switch(getStatus(status)) {
-        case(ACT):
-            displayCurrentInformation();
-            break;
         case(FIN):
-            displayMostRecent();
+        case(ACT):
+            receiveAndDisplay();
             break;
         case(NOK):
             printf("No games associated with your PLID were found!\n");
@@ -319,66 +321,51 @@ void state() {
     close(tcpfd);
 }
 
-void displayCurrentInformation() {
+void receiveAndDisplay() {
     char word[MAX_WORD_SIZE], status[10], fileName[MAX_FILENAME_SIZE];
     int fileSize, offset;
 
-    read(tcpfd, buffer, MAX_STR);
-    sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
+    int readBytes = read(tcpfd, buffer, MAX_STR);
+    sscanf(buffer, "%s %d%n", fileName, &fileSize, &offset);
 
     FILE* f = fopen(fileName, "w");
 
-    fprintf(f, "%s", buffer+offset);
-    printf("%s", buffer);
-    while(read(tcpfd, buffer, MAX_STR) > 0) {
-        fprintf(f, "%s", buffer);
-        printf("%s", buffer);
+    fwrite(buffer+offset+1, 1, readBytes-offset-1, f);
+    printf("%.*s", readBytes-offset-1, buffer+offset+1);
+    while((readBytes = read(tcpfd, buffer, MAX_STR)) > 0) {
+        fwrite(buffer, 1, readBytes, f);
+        printf("%.*s", readBytes, buffer);
     }
 
-    fclose(f);
-}
-
-void displayMostRecent() {
-    char word[MAX_WORD_SIZE], status[10], fileName[MAX_FILENAME_SIZE];
-    int fileSize, offset;
-
-    sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
-
-    FILE* f = fopen(fileName, "w");
-
-    fprintf(f, "%s", buffer+offset);
-    while(read(tcpfd, buffer, MAX_STR) > 0)
-        fprintf(f, "%s", buffer);
+    printf("File %s created with size %d!\n", fileName, fileSize);
 
     fclose(f);
 }
 
-void correctGuess(char *token, char letter) {
+void correctGuess(char *token, char letter, enum status stat) {
     int positions[MAX_WORD_SIZE];
     for(int i = 0; i < MAX_WORD_SIZE; i++) positions[i] = 0;
     // Skip trial
     strtok(NULL, " ");
-    // fetch positions
+    // skip num of positions found
+    strtok(NULL, " ");
     token = strtok(NULL, " ");
     int i = 0;
     while(token != NULL) {
-        positions[atoi(token)*2] = 1;
+        wordUnderscores[(atoi(token)-1)*2] = letter;
 
         token = strtok(NULL, " ");
     }
-    for(int i = 0; i < num_letters*2; i+=2) {
-        if (positions[i] == 1)
-            wordUnderscores[i] = letter;
-        wordUnderscores[i+1] = ' '; 
-    }
     wordUnderscores[num_letters*2-1] = '\0';
-    for(int i = 0; i < MAX_WORD_SIZE; i++) { 
-        if (wordUnderscores[i] == '_') {
-            printf("Correct guess. Word: %s\n", wordUnderscores);
-            return;
-        }
+    if(stat == OK) {
+        printf("Correct guess. Word: %s\n", wordUnderscores);
+        return;
     }
-    printf("Word: %s!\nYou win!\n", wordUnderscores);
+    if(stat == WIN) {
+        for(int i = 0; i < strlen(wordUnderscores); i++) { if (wordUnderscores[i] == '_') wordUnderscores[i] = letter; }
+        printf("Word: %s!\nYou win!\n", wordUnderscores);
+        return;
+    }
 }
 
 void guess_word() {
@@ -390,9 +377,10 @@ void guess_word() {
 
     offset = sprintf(message, "PWG %s %s %d\n", plid, word, trial);
 
-    SEND(message, MAX_STR);
+    SEND(message, offset);
 
-    RECEIVE(buffer, MAX_STR);
+    if(receiveUDP(buffer) == -1)
+        return;
 
     char status[COMMAND_SIZE];
     sscanf(buffer, "RWG %s %*s", status);
@@ -402,16 +390,18 @@ void guess_word() {
             printf("You win!\n");
             break;
         case(NOK):
-            printf("Incorrect guess.\n%d/%d errors made.\n", ++errorsMade, num_errors);
+            printf("Incorrect guess. %d/%d errors made.\n", ++errorsMade, num_errors);
+            trial++;
             break;
         case(INV):
             printf("Invalid trial numbers!\n");
             break; 
         case(OVR):
-            printf("Incorrect guess.\nGame over!\n");
+            printf("Incorrect guess.Game over!\n");
             break;
         case(ERR):
             printf("The server encountered an error. Please verify that you have an ongoing game (type sg <plid> to start one), that you entered a valid PLID, or that you typed this command correctly (gw <word>).");
+            break;
     }
 }
 
@@ -424,26 +414,23 @@ void reveal() {
 
     SEND(message, offset);
 
-    RECEIVE(buffer, MAX_STR);
+    if(receiveUDP(buffer) == -1)
+        return;
 
-    char status[COMMAND_SIZE], word[MAX_WORD_SIZE], *token;
+    char status[COMMAND_SIZE], word[MAX_WORD_SIZE], *token, code[MAX_WORD_SIZE];
     
-    token = strtok(buffer+COMMAND_SIZE, "/");
-    strcpy(word, token);
-    sscanf(strtok(NULL, "/"), "%s\n", status);
-
-    switch(getStatus(status)) {
-        case(OK):
-            printf("Reveal requested.\nWord: %s.\nGame over!\n", word);
-            break;
-        default:
-            printf("The server encountered an error. Are you sure you have an ongoing game?\n");
-            break;
+    sscanf(buffer, "%s%n", code, &offset);
+    if(strcmp(code, "RRV") != 0) {
+        printf("The server encountered an error. Are you sure you have an ongoing game?\n");
+        return;
     }
+    sscanf(buffer+offset, " %s", word);
+
+    printf("Reveal requested.\nWord: %s.\nGame over!\n", word);
 }
 
 // Returns an integer indicating wether the game was successfully quit
-int quit_game() {
+void quit_game() {
     char message[MAX_STR];
     int offset;
 
@@ -451,19 +438,15 @@ int quit_game() {
 
     SEND(message, offset);
 
-    RECEIVE(buffer, MAX_STR);
+    if(receiveUDP(buffer) == -1)
+        return;
 
     char status[COMMAND_SIZE];
     sscanf(buffer, "RQT %s\n", status);
 
-    switch(getStatus(status)) {
-        case(OK):
+    if(getStatus(status) == OK)
             printf("User quit! Game over!\n");
-            return 0;
-        default:
-            printf("The server encountered an error. Are you sure you have an ongoing game?\n");
-            return 1;
-    }
+    return;
 }
 
 
@@ -479,6 +462,49 @@ enum status getStatus(char* status) {
     if (strcmp(status, "EMPTY") == 0) { return EMPTY; }
     if (strcmp(status, "ACT") == 0) { return ACT; }
     if (strcmp(status, "FIN") == 0) { return FIN; }
+}
+
+int receiveUDP() {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(udpfd, &readfds);
+    struct timeval tv;
+    if(TIMEOUT_ENABLED) {
+        tv.tv_sec = TIMEOUT_SEC;
+        select(udpfd+1, &readfds, NULL, NULL, &tv);
+    }
+    else
+        select(udpfd+1, &readfds, NULL, NULL, NULL);
+    if(TIMEOUT_ENABLED && tv.tv_sec == 0) {
+        printf("No response was received from the server. Please try again later.\n");
+        return -1;
+    }
+    addrlen = sizeof(addr); 
+    int n = recvfrom(udpfd, buffer, MAX_STR, 0, (struct sockaddr*) &addr, &addrlen); 
+    if (n == -1) exit(1);
+    return 0;
+}
+
+int receiveTCP(int amount, int *amountRead) {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(tcpfd, &readfds);
+    struct timeval tv;
+    if(TIMEOUT_ENABLED) {
+        tv.tv_sec = TIMEOUT_SEC;
+        select(tcpfd+1, &readfds, NULL, NULL, &tv);
+    }
+    else
+        select(tcpfd+1, &readfds, NULL, NULL, NULL);
+    if(TIMEOUT_ENABLED && tv.tv_sec == 0) {
+        printf("No response was received from the server. Please try again later.\n");
+        return -1;
+    }
+    if(amountRead == NULL)
+        read(tcpfd, buffer, amount);
+    else
+        amountRead = read(tcpfd, buffer, amount);
+    return 0;
 }
 
 // djb2 hashing method for simplicity and switch case
