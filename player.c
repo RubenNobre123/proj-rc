@@ -79,19 +79,21 @@ int main (int argc, char **argv) {
 
 void start_game() {
     char message[MAX_STR];
+    int offset;
     CLEAN_BUFFER();
 
     scanf("%s", plid);
     
-    sprintf(message, "SNG %s\n", plid);
+    offset = sprintf(message, "SNG %s\n", plid);
 
-    SEND(message, strlen(message));
+    SEND(message, offset);
 
     RECEIVE(buffer, MAX_STR);
 
     trial = 1;
     char status[2];
     sscanf(buffer, "%*s %s", status);
+
     if (strcmp(status, "NOK") == 0)
     {
         printf("Game already in progress.\n");
@@ -107,15 +109,19 @@ void start_game() {
 
 void play() {
     char letter, message[MAX_STR], *token, *status;
+    int offset;
     CLEAN_BUFFER();
 
     scanf(" %c", &letter);
 
-    sprintf(message, "PLG %s %c %d\n", plid, letter, trial);
+    offset = sprintf(message, "PLG %s %c %d\n", plid, letter, trial);
+    printf("%s", message);
 
-    SEND(message, strlen(message));
+    SEND(message, offset);
 
     RECEIVE(buffer, MAX_STR);
+    printf("%s", buffer);
+
     token = strtok(buffer, " ");
     // fetch status
     status = strtok(NULL, " ");
@@ -140,14 +146,15 @@ void play() {
             printf("Incorrect guess.\nGame over!\n");
             break;
         default:
-            printf("The server encountered an error. Please verify that you have an ongoing game (type sg <plid> to start one), you entered a valid PLID, or that you typed this command correctly (pl <letter>).");
+            printf("The server encountered an error. Please verify that you have an ongoing game (type sg <plid> to start one), you entered a valid PLID, or that you typed this command correctly (pl <letter>).\n");
     }
 }
 
 void scoreboard() {
     char message[MAX_STR], status[10];
+    int offset;
 
-    sprintf(message, "GSB\n");
+    offset = sprintf(message, "GSB\n");
 
     tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
     if (tcpfd==-1) exit(1); //error
@@ -161,7 +168,7 @@ void scoreboard() {
 
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
 
-    write(tcpfd, message, strlen(message));
+    write(tcpfd, message, offset);
 
     read(tcpfd, buffer, MAX_STR);
 
@@ -184,29 +191,20 @@ void scoreboard() {
 
 void receiveScoreboard() {
     char sbName[MAX_FILENAME_SIZE], line[MAX_STR];
-    int sbSize;
+    int sbSize, bytesRead, offset;
     
-    read(tcpfd, buffer, MAX_STR);
-    int bytesRead;
-    sscanf(buffer, "%s %d\n%n", sbName, &sbSize, &bytesRead);
+    bytesRead = read(tcpfd, buffer, MAX_STR);
+    sscanf(buffer, "%s %d\n%n", sbName, &sbSize, &offset);
     
     int toWrite = sbSize;
     FILE* sb = fopen(sbName, "w");
 
-    printf("%s", buffer+bytesRead);
-    toWrite-=fprintf(sb, "%s", buffer+bytesRead);
-    while(toWrite-MAX_STR > 0) {        
-        if(read(tcpfd, buffer, MAX_STR) > 0) {
-            printf("%s", buffer);
-            toWrite -= fprintf(sb, "%s", buffer);
+    toWrite-=fwrite(buffer+offset, 1, bytesRead-offset, sb);
+    while(toWrite > 0) {
+        if((bytesRead = read(tcpfd, buffer, MAX_STR)) > 0) {
+            toWrite -= fwrite(buffer, 1, bytesRead, sb);
             memset(buffer, '\0', MAX_STR);
         }
-    }
-
-    if(read(tcpfd, buffer, toWrite) > 0) {
-        printf("%s", buffer);
-        toWrite -= fprintf(sb, "%s", buffer);
-        memset(buffer, '\0', MAX_STR);
     }
     
     printf("File %s created with size %d\n", sbName, sbSize);
@@ -216,8 +214,9 @@ void receiveScoreboard() {
 
 void hint() {
     char message[MAX_STR], status[10];
+    int offset;
 
-    sprintf(message, "GHL %s\n", plid);
+    offset = sprintf(message, "GHL %s\n", plid);
 
     tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
     if (tcpfd==-1) exit(1); //error
@@ -231,7 +230,7 @@ void hint() {
 
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
 
-    write(tcpfd, message, strlen(message));
+    write(tcpfd, message, offset);
 
     read(tcpfd, buffer, MAX_STR);
 
@@ -260,8 +259,6 @@ void receiveFile() {
 
     sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
 
-    printf("%s %d\n", fileName, fileSize);
-
     int toWrite = fileSize;
     FILE* sb = fopen(fileName, "wb");
 
@@ -274,13 +271,86 @@ void receiveFile() {
         }
     }
 
-    printf("File %s created with size %d\n", fileName, fileSize);
+    printf("Hint %s created with size %d!\n", fileName, fileSize);
 
     fclose(sb);
 }
 
 void state() {
-    return;
+    char message[MAX_STR], status[10];
+    int offset;
+
+    offset = sprintf(message, "STA %s\n", plid);
+
+    tcpfd=socket(AF_INET,SOCK_STREAM,0); //TCP socket
+    if (tcpfd==-1) exit(1); //error
+
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET; //IPv4
+    hints.ai_socktype=SOCK_STREAM;
+
+    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    if(errcode!=0)/*error*/exit(1);
+
+    connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
+
+    write(tcpfd, message, offset);
+
+    memset(buffer, '\0', MAX_STR);
+    read(tcpfd, buffer, MAX_STR);
+
+    sscanf(buffer, "RST %s", status);
+
+    switch(getStatus(status)) {
+        case(ACT):
+            displayCurrentInformation();
+            break;
+        case(FIN):
+            displayMostRecent();
+            break;
+        case(NOK):
+            printf("No games associated with your PLID were found!\n");
+            break;
+        default:
+            printf("Unknown error ocurred.");
+            break;
+    }
+
+    close(tcpfd);
+}
+
+void displayCurrentInformation() {
+    char word[MAX_WORD_SIZE], status[10], fileName[MAX_FILENAME_SIZE];
+    int fileSize, offset;
+
+    read(tcpfd, buffer, MAX_STR);
+    sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
+
+    FILE* f = fopen(fileName, "w");
+
+    fprintf(f, "%s", buffer+offset);
+    printf("%s", buffer);
+    while(read(tcpfd, buffer, MAX_STR) > 0) {
+        fprintf(f, "%s", buffer);
+        printf("%s", buffer);
+    }
+
+    fclose(f);
+}
+
+void displayMostRecent() {
+    char word[MAX_WORD_SIZE], status[10], fileName[MAX_FILENAME_SIZE];
+    int fileSize, offset;
+
+    sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
+
+    FILE* f = fopen(fileName, "w");
+
+    fprintf(f, "%s", buffer+offset);
+    while(read(tcpfd, buffer, MAX_STR) > 0)
+        fprintf(f, "%s", buffer);
+
+    fclose(f);
 }
 
 void correctGuess(char *token, char letter) {
@@ -313,11 +383,12 @@ void correctGuess(char *token, char letter) {
 
 void guess_word() {
     char word[MAX_WORD_SIZE], message[MAX_STR];
+    int offset;
     CLEAN_BUFFER();
 
     scanf(" %s", word);
 
-    sprintf(message, "PWG %s %s %d\n", plid, word, trial);
+    offset = sprintf(message, "PWG %s %s %d\n", plid, word, trial);
 
     SEND(message, MAX_STR);
 
@@ -347,10 +418,11 @@ void guess_word() {
 
 void reveal() {
     char message[MAX_STR];
+    int offset;
     
-    sprintf(message, "REV %s\n", plid);
+    offset = sprintf(message, "REV %s\n", plid);
 
-    SEND(message, MAX_STR);
+    SEND(message, offset);
 
     RECEIVE(buffer, MAX_STR);
 
@@ -373,10 +445,11 @@ void reveal() {
 // Returns an integer indicating wether the game was successfully quit
 int quit_game() {
     char message[MAX_STR];
-    
-    sprintf(message, "QUT %s\n", plid);
+    int offset;
 
-    SEND(message, MAX_STR);
+    offset = sprintf(message, "QUT %s\n", plid);
+
+    SEND(message, offset);
 
     RECEIVE(buffer, MAX_STR);
 
@@ -385,7 +458,7 @@ int quit_game() {
 
     switch(getStatus(status)) {
         case(OK):
-            printf("User quit!\nGame over!\n");
+            printf("User quit! Game over!\n");
             return 0;
         default:
             printf("The server encountered an error. Are you sure you have an ongoing game?\n");
@@ -404,6 +477,8 @@ enum status getStatus(char* status) {
     if (strcmp(status, "INV") == 0) { return INV; }  
     if (strcmp(status, "QUT") == 0) { return QUT; }
     if (strcmp(status, "EMPTY") == 0) { return EMPTY; }
+    if (strcmp(status, "ACT") == 0) { return ACT; }
+    if (strcmp(status, "FIN") == 0) { return FIN; }
 }
 
 // djb2 hashing method for simplicity and switch case

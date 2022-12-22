@@ -19,7 +19,7 @@
 #define REQUEST_PWG 193467059
 #define REQUEST_RWG 193469237
 #define REQUEST_GSB 193457121
-#define REQUEST_GHL 193492704
+#define REQUEST_GHL 193456768
 #define REQUEST_STA 193506157
 #define REQUEST_QUT 193468095
 #define REQUEST_RQT 193469052
@@ -57,6 +57,7 @@ int playLetter(char* gamePath, char letter, int userTrial, char* content, int* s
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);
 int createScoreboard(char* scoreboardPath, int nFiles);
+long getFileSize(char* file);
 void sng(char* plid); 
 void plg(char* args); 
 void pwg(char* args);

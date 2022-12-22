@@ -44,7 +44,9 @@ enum status {
     OVR,
     INV,
     QUT,
-    EMPTY
+    EMPTY,
+    ACT,
+    FIN
 };
 
 // Auxiliary functions
@@ -54,6 +56,8 @@ void init(int argc, char **argv);
 int hash(char* arg);
 void receiveScoreboard();
 void receiveFile();
+void displayCurrentInformation();
+void displayMostRecent();
 
 // Command-handling functions
 void start_game();

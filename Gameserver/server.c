@@ -108,6 +108,7 @@ int main(int argc, char** argv){
                     case(REQUEST_GSB): gsb(); break;
                     case(REQUEST_GHL): ghl(request+COMMAND_SIZE); break;
                     case(REQUEST_STA): sta(request+COMMAND_SIZE); break;
+                    default: UNKOWN_MESSAGE(command); break;
                 }
                 close(connfd);
                 close(tcpfd);
@@ -268,8 +269,6 @@ void qut(char* args) {
 void rev(char *args) {
     char path[MAX_STR], plid[MAX_PLID_SIZE], reply[MAX_STR], word[MAX_WORD_SIZE];
     enum status stat;
-    stat = QUT;
-
 
     sprintf(word, "##");
 
@@ -282,7 +281,7 @@ void rev(char *args) {
         FILE* game = fopen(path, "r");
         fscanf(game, "%s %*s\n", word);
 
-        endGame(path, (int*) &stat);
+        remove(path);
 
         stat = OK;
     }
@@ -294,7 +293,7 @@ void rev(char *args) {
 }
 
 void gsb() {
-    char buffer[MAX_STR], scoreboardPath[MAX_STR], line[50], scoresDir[MAX_STR], reply[MAX_STR*2];
+    char buffer[MAX_STR], scoreboardPath[MAX_STR], line[MAX_STR], scoresDir[MAX_STR], reply[MAX_STR*2];
     enum status stat;
     
     sprintf(scoresDir, "./SCORES/");
@@ -312,20 +311,20 @@ void gsb() {
 
     stat = nFiles == 0 ? EMPTY : OK;
 
-    int bytes = createScoreboard(scoreboardPath, nFiles);
-
-    sprintf(reply, "RSB %s", statusToString(stat));
+    sprintf(reply, "RSB %s\n", statusToString(stat));
     write(connfd, reply, MAX_STR);
 
     if(stat==OK) {
+        long bytes = createScoreboard(scoreboardPath, nFiles);
         FILE* sb = fopen(scoreboardPath, "r");
+        int offset, readBytes, bytesRead;
 
-        fgets(line, MAX_STR, sb);
-        sprintf(reply, "%s %d\n%s", "scoreboard.txt", bytes, line);
-        write(connfd, reply, MAX_STR);
+        sprintf(reply, "%s %ld\n%n", "scoreboard.txt", bytes, &offset);
+        write(connfd, reply, offset);
 
-        while(fgets(line, MAX_STR, sb)) {
-            write(connfd, line, MAX_STR);
+        while(bytes > 0) {
+            bytesRead = fread(line, 1, MAX_STR, sb);
+            bytes -= write(connfd, line, bytesRead);
         }
 
         fclose(sb);
@@ -370,7 +369,7 @@ int createScoreboard(char* scoreboardPath, int nFiles) {
 void ghl(char *args) {
     char buffer[MAX_STR], path[MAX_STR], image[MAX_FILENAME_SIZE], line[50], scoresDir[MAX_STR], reply[MAX_STR*2], plid[MAX_PLID_SIZE];
     enum status stat;
-    
+
     // Falta verificar se o plid é válido
     strncpy(plid, args, MAX_PLID_SIZE-1);
     plid[MAX_PLID_SIZE-1] = '\0';
@@ -386,23 +385,38 @@ void ghl(char *args) {
     }
     else stat = NOK;
 
-    sprintf(reply, "RHL %s", statusToString(stat));
+    sprintf(reply, "RHL %s\n", statusToString(stat));
     write(connfd, reply, MAX_STR);
 
     if(stat==OK) {
-        FILE* sb = fopen(image, "r");
+        char imagePath[MAX_STR] = "./images/";
+        strcat(imagePath, image);
+        FILE* img = fopen(imagePath, "rb");
+        int bytesRead, offset;
+        long fileSize = getFileSize(imagePath);
 
-        fgets(line, MAX_STR, sb);
-        sprintf(reply, "%s %d\n%s", "scoreboard.txt", bytes, line);
-        write(connfd, reply, MAX_STR);
+        sprintf(reply, "%s %ld\n%n", image, fileSize, &offset);
+        write(connfd, reply, offset);
 
-        while(fgets(line, MAX_STR, sb)) {
-            write(connfd, line, MAX_STR);
+        while(fileSize > 0) {
+            bytesRead = fread(line, 1, MAX_STR, img);
+            fileSize -= write(connfd, line, bytesRead);
         }
 
-        fclose(sb);
+        fclose(img);
+    }
+    else {
+        strcat(reply, "\n");
+        write(connfd, reply, MAX_STR);
+    }
+}
 
-    SEND(reply);
+long getFileSize(char* file) {
+    FILE* fp = fopen(file, "rb");
+    fseek(fp, 0L, SEEK_END);
+    long size = ftell(fp);
+    fclose(fp);
+    return size;
 }
 
 void sta(char *args) {
