@@ -1,8 +1,0 @@
-abracadabra witch.jpg
-T a 5
-T b 2
-T t 0
-T r 2
-G banana
-G abracadabra
-WIN

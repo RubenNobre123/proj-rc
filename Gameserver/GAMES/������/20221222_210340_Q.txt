@@ -1,0 +1,4 @@
+abracadabra witch.jpg
+G abracadabra
+WIN
+QUIT

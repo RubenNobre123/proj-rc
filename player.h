@@ -1,13 +1,12 @@
-#define PORT "58001"
-#define HOSTNAME NULL
+#define DEFAULT_PORT "58037"
 #define MAX_STR 256
 
-#define TIMEOUT_SEC 1
+#define TIMEOUT_SEC 10
 #define TIMEOUT_ENABLED 0
 
 // Relevant application-related constants
 #define MAX_GSPORT_SIZE 6
-#define MAX_GSIP_SIZE 16
+#define MAX_GSIP_SIZE 100
 #define COMMAND_SIZE 4
 #define REQUEST_SIZE 50
 #define MAX_PLID_SIZE 7
@@ -34,9 +33,8 @@
 #define COMMAND_REV 193504594
 
 // Macros
-#define CLEAN_BUFFER() { for(int i = 0; i < MAX_STR; i++) buffer[i] = '\0'; }
+#define CLEAN_BUFFER() { memset(buffer, '\0', MAX_STR); }
 #define SEND(message, size) { int n = sendto(udpfd, message, size, 0, res->ai_addr, res->ai_addrlen); if (n == -1) exit(1); }
-#define RECEIVE(buffer, size) { addrlen = sizeof(addr); int n = recvfrom(udpfd, buffer, size, 0, (struct sockaddr*) &addr, &addrlen); if (n == -1) exit(1); }
 
 enum status {
     NOK,

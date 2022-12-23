@@ -9,30 +9,30 @@
 #include <netdb.h>
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
 #include "server.h"
 
-int udpfd, tcpfd, connfd, errcode;
+int udpfd, tcpfd, connfd, errcode, verbose = 0, childpid;
 fd_set fdreads;
 ssize_t n, lineNumber = 0;
 socklen_t addrlen;
 struct addrinfo hints, *res;
 struct sockaddr_in addr, cliaddr;
-char words_file[128];
+char words_file[128], gsport[MAX_GSPORT_SIZE];
 
 int main(int argc, char** argv){
     char request[REQUEST_SIZE];
     init(argc, argv);
-
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family=AF_INET;//IPv4
     hints.ai_socktype=SOCK_STREAM;//TCP socket
     hints.ai_flags=AI_PASSIVE;
 
-    n = getaddrinfo(NULL, PORT, &hints, &res);
+    n = getaddrinfo(NULL, gsport, &hints, &res);
 
     /* create listening TCP socket */
     tcpfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -51,7 +51,7 @@ int main(int argc, char** argv){
     hints.ai_socktype=SOCK_DGRAM;//UDP socket
     hints.ai_flags=AI_PASSIVE;
 
-    n = getaddrinfo("localhost", PORT, &hints, &res);
+    n = getaddrinfo(NULL, gsport, &hints, &res);
     if(n != 0) exit(1);
 
     /* create UDP socket */
@@ -91,7 +91,6 @@ int main(int argc, char** argv){
             }
         }
         else if (FD_ISSET(tcpfd, &copy)) {
-            pid_t childpid;
             char command[COMMAND_SIZE];
             char request[REQUEST_SIZE];
             
@@ -102,20 +101,19 @@ int main(int argc, char** argv){
             strncpy(command, request, COMMAND_SIZE);
             command[COMMAND_SIZE-1] = '\0';
 
-/*            childpid = fork();
-            if (childpid == 0) {*/
+            childpid = fork();
+            if (childpid == 0) {
                 switch(hash(command)) {
                     case(REQUEST_GSB): gsb(); break;
                     case(REQUEST_GHL): ghl(request+COMMAND_SIZE); break;
                     case(REQUEST_STA): sta(request+COMMAND_SIZE); break;
                     default: UNKOWN_MESSAGE(command); break;
-                }/*
+                }
                 close(connfd);
                 close(tcpfd);
                 close(udpfd);
                 exit(0);
             }
-                */
             close(connfd);
         }
     }
@@ -126,12 +124,17 @@ void sng(char* args) {
     enum status stat;
     int i = 0, num_errors, n_letters, chosen = 0;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
 
-    if(ongoingGame(path))
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "SNG", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
+
+    if(fileExists(path))
     {
         // Already exists
         stat = NOK;
@@ -146,6 +149,7 @@ void sng(char* args) {
 
         while(!chosen) {
             FILE* words = fopen(words_file, "r");   
+            lineNumber = 0;
             while((ptr = fgets(line, sizeof(line), words)))
             {
                 if(i == lineNumber)
@@ -164,11 +168,7 @@ void sng(char* args) {
                 }
                 else i++;
             }
-            // Reached EOF, should still choose a word
-            if(ptr == NULL) {
-                lineNumber = 0;
-                stat = NOK;
-            }
+            fclose(words);
         }
     }
     if(stat == NOK)
@@ -184,14 +184,19 @@ void plg(char* args) {
     int trial, positions[MAX_WORD_SIZE], found;
     enum status stat;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
+
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "PLG", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
 
     sscanf(args, "%s %c %d", plid, &letter, &trial);
 
-    if(ongoingGame(path)) {
+    if(fileExists(path)) {
 
         found = playLetter(path, letter, trial, content, (int*) &stat, positions);
 
@@ -204,16 +209,18 @@ void plg(char* args) {
     else
         stat = ERR;
     
-    if(stat == ERR)
-        sprintf(reply, "RLG %s", statusToString(stat));
+    if(stat != OK)
+        sprintf(reply, "RLG %s\n", statusToString(stat));
     else {
         sprintf(reply, "RLG %s %d %d ", statusToString(stat), trial, found);
         int i = 0;
         while(i < found) {
-            sprintf(reply+strlen(reply), "%d ", positions[i++]);
+            if(i+1 == found)
+                sprintf(reply+strlen(reply), "%d\n", positions[i++]);
+            else
+                sprintf(reply+strlen(reply), "%d ", positions[i++]);
         }
     }
-    sprintf(reply+strlen(reply), "\n");
     SEND(reply);
 }
 
@@ -222,14 +229,19 @@ void pwg(char* args) {
     int trial;
     enum status stat;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
+
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "PWG", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
 
     sscanf(args, "%s %s %d", plid, word, &trial);
 
-    if(ongoingGame(path)) {
+    if(fileExists(path)) {
         
         guessWord(path, word, trial, content, (int*) &stat);
 
@@ -254,13 +266,19 @@ void qut(char* args) {
     char plid[MAX_PLID_SIZE], path[MAX_STR] = GAMES_DIRECTORY, reply[MAX_STR];
     enum status stat;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
+
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "QUT", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
+
     stat = QUT;
 
-    if(ongoingGame(path)) {
+    if(fileExists(path)) {
         endGame(path, (int*) &stat);
         stat = OK;
     }
@@ -277,12 +295,17 @@ void rev(char *args) {
 
     sprintf(word, "##");
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
 
-    if(ongoingGame(path)) {
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "REV", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
+
+    if(fileExists(path)) {
         FILE* game = fopen(path, "r");
         fscanf(game, "%s %*s\n", word);
 
@@ -300,10 +323,12 @@ void rev(char *args) {
 void gsb() {
     char buffer[MAX_STR], scoreboardPath[MAX_STR], line[MAX_STR], scoresDir[MAX_STR], reply[MAX_STR*2];
     enum status stat;
-    
-    sprintf(scoresDir, "./SCORES/");
 
-    DIR* dir = opendir(scoresDir);
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "SNG", inet_ntoa(addr.sin_addr), gsport, "N/A");
+    }
+
+    DIR* dir = opendir(GAMES_DIRECTORY);
     // Start reading scoreDir and count how many files are in it
     struct dirent* entry;
     int nFiles = 0;
@@ -375,12 +400,17 @@ void ghl(char *args) {
     char buffer[MAX_STR], path[MAX_STR], image[MAX_FILENAME_SIZE], line[50], scoresDir[MAX_STR], reply[MAX_STR*2], plid[MAX_PLID_SIZE];
     enum status stat;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
 
-    if(ongoingGame(path)) {
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "GHL", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
+
+    if(fileExists(path)) {
         FILE* game = fopen(path, "r");
 
         fscanf(game, "%*s %s\n", image);
@@ -420,12 +450,17 @@ void sta(char *args) {
     char buffer[MAX_STR], path[MAX_STR], fname[MAX_FILENAME_SIZE], image[MAX_FILENAME_SIZE], line[50], scoresDir[MAX_STR], reply[MAX_STR*2], plid[MAX_PLID_SIZE];
     enum status stat;
 
-    // Falta verificar se o plid é válido
-    strncpy(plid, args, MAX_PLID_SIZE-1);
-    plid[MAX_PLID_SIZE-1] = '\0';
-    sprintf(path, "./GAMES/GAME_%s.txt", plid);
+    if(getArguments(args, plid, path) == -1) {
+        sprintf(reply, "ERR\n");
+        SEND(reply);
+        return;
+    }
 
-    if(ongoingGame(path)) {
+    if(verbose) {
+        printf("Received %s request from IP %s and port %s with PLID %s.\n", "STA", inet_ntoa(addr.sin_addr), gsport, plid); 
+    }
+
+    if(fileExists(path)) {
         FILE* game = fopen(path, "r");
 
         fscanf(game, "%*s %s\n", image);
@@ -667,7 +702,7 @@ void endGame(char* gamePath, int *stat) {
 
     plid[MAX_PLID_SIZE-1] = '\0';
 
-    sprintf(dir, "./GAMES/%s/", plid);
+    sprintf(dir, "%s%s/", GAMES_DIRECTORY, plid);
     DIR* d;
     if((d = opendir(dir))) closedir(d);
     else mkdir(dir, 0777);
@@ -722,7 +757,7 @@ void createScore(char* gamePath, char* plid) {
     
     t = localtime(&rawtime);
 
-    sprintf(scorePath, "./SCORES/%03d_%s_%d%02d%02d_%02d%02d%02d.txt", score, plid, 1900+t->tm_year, 1+t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+    sprintf(scorePath, "%s/%03d_%s_%d%02d%02d_%02d%02d%02d.txt", SCORES_DIRECTORY, score, plid, 1900+t->tm_year, 1+t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
 
     FILE* scoreFile = fopen(scorePath, "w");
 
@@ -766,9 +801,49 @@ int hash(char* arg) {
 
 void init(int argc, char** argv) {
 
-    if (argc < 2)
-        ERRORMSG();
-    sprintf(words_file, "./%s", argv[1]);
+    mkdir(GAMES_DIRECTORY, 0777);
+    mkdir(SCORES_DIRECTORY, 0777);
+
+    struct sigaction act;
+
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = SIG_IGN;
+
+    if(sigaction(SIGPIPE, &act, NULL) == -1) {
+        exit(-1);
+    }
+    signal(SIGKILL, sigHandler);
+
+
+    if(argc < 2) {
+        printf("Usage: %s <words_file> [-p <port>] [-v]\n", argv[0]);
+        exit(-1);
+    }
+
+    strcpy(words_file, argv[1]);
+
+    for (int i = 2; i < argc; i += 2)
+    {
+
+        if (argv[i][0] != '-')
+            exit(1);
+
+        switch (argv[i][1])
+        {
+
+        case 'v':
+            verbose = 1;
+            break;
+
+        case 'p':
+            strcpy(gsport, argv[i + 1]);
+            break;
+        }
+    }
+}
+
+void sigHandler() {
+    killpg(childpid, SIGKILL);
 }
 
 char* statusToString(enum status s) {
@@ -783,7 +858,7 @@ int ongoingGame(char* path) {
         FILE* game = fopen(path, "r");
         fgets(line, sizeof(line), game);
         fgets(line, sizeof(line), game);
-        return line != NULL;
+        return (line[0] == 'G' || line[0] == 'T');
     }
 }
 
@@ -792,4 +867,19 @@ int fileExists(char* path) {
     if(f)
         fclose(f);
     return f != NULL;
+}
+
+int getArguments( char* args, char* plid, char *path) {
+
+    snprintf(plid,  MAX_PLID_SIZE, "%s", args);
+    plid[MAX_PLID_SIZE-1] = '\0';
+
+    int n = atoi(plid); 
+    if(strlen(plid) < 6 || n > 200000) {
+        return -1;
+    }
+
+    sprintf(path, "%sGAME_%s.txt", GAMES_DIRECTORY, plid);
+
+    return 0;
 }

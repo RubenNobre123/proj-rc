@@ -1,4 +1,4 @@
-#define PORT "58001"
+#define DEFAULT_PORT "58037"
 #define MAX_STR 256
 
 // Relevant application-related constants
@@ -27,6 +27,7 @@
 #define REQUEST_REV 193468658
 
 #define GAMES_DIRECTORY "./GAMES/"
+#define SCORES_DIRECTORY "./SCORES/"
 
 #define ERRORMSG() { printf("Usage: ./GS word_file [-p GSport] [-v]\n"); exit(1); }
 #define UNKOWN_MESSAGE(msg) { printf("Unknown protocol message received: %s\n", msg);}
@@ -54,8 +55,10 @@ void writeToUserFile(char* path, char* content);
 void stringToUpper(char* arg);
 char* statusToString(enum status s);
 int fileExists(char* path);
+void sigHandler();
 int ongoingGame(char *path);
 void endGame(char* gamePath, int *stat);
+int getArguments( char* args, char* plid, char *path);
 int playLetter(char* gamePath, char letter, int userTrial, char* content, int* stat, int* positions) ;
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);

@@ -15,22 +15,19 @@ struct addrinfo hints,*res, *tcpRes;
 struct sockaddr_in addr;
 char buffer[MAX_STR], gsport[MAX_GSPORT_SIZE], gsip[MAX_GSIP_SIZE], hostname[MAX_HOSTNAME_SIZE], plid[MAX_PLID_SIZE], wordUnderscores[MAX_WORD_SIZE*2];
 
-
-//test comment
-
 int main (int argc, char **argv) {
     char command[COMMAND_SIZE];
     CLEAN_BUFFER();
     init(argc, argv);
 
-    udpfd=socket(AF_INET,SOCK_DGRAM,0); //TCP socket
-    if (udpfd==-1) exit(1); //error
+    udpfd=socket(AF_INET,SOCK_DGRAM,0);
+    if (udpfd==-1) exit(1);
 
     memset(&hints,0,sizeof hints);
-    hints.ai_family=AF_INET; //IPv4
+    hints.ai_family=AF_INET;
     hints.ai_socktype=SOCK_DGRAM;
 
-    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &res);
+    errcode = getaddrinfo(gsip, gsport, &hints, &res);
     if(errcode!=0)/*error*/exit(1);
 
     while(1) {
@@ -69,7 +66,7 @@ int main (int argc, char **argv) {
                 break;
             case(COMMAND_EXIT):
                 quit_game();
-                break;
+                return 0;
             default:
                 printf("Error!\n");
                 break;
@@ -92,8 +89,14 @@ void start_game() {
         return;
 
     trial = 1;
-    char status[2];
-    sscanf(buffer, "%*s %s%n", status, &offset);
+    char status[2], code[4];
+    sscanf(buffer, "%s %s%n", code, status, &offset);
+
+    if(getStatus(code)==ERR) {
+        printf("Invalid PLID!\n");
+        return;
+    }
+
 
     if (strcmp(status, "NOK") == 0)
     {
@@ -123,10 +126,14 @@ void play() {
     if(receiveUDP(buffer) == -1)
         return;
 
+
     token = strtok(buffer, " ");
-    // fetch status
     status = strtok(NULL, " ");
+    if(status[strlen(status)-1] == '\n')
+        status[strlen(status)-1] = '\0';
+
     enum status stat = getStatus(status);
+
     switch(stat) {
         case(OK):
         case(WIN):
@@ -164,7 +171,7 @@ void scoreboard() {
     hints.ai_family=AF_INET; //IPv4
     hints.ai_socktype=SOCK_STREAM;
 
-    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    errcode = getaddrinfo(gsip, gsport, &hints, &tcpRes);
     if(errcode!=0)/*error*/exit(1);
 
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
@@ -228,7 +235,7 @@ void hint() {
     hints.ai_family=AF_INET; //IPv4
     hints.ai_socktype=SOCK_STREAM;
 
-    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    errcode = getaddrinfo(gsip, gsport, &hints, &tcpRes);
     if(errcode!=0)/*error*/exit(1);
 
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
@@ -259,7 +266,8 @@ void receiveFile() {
     char fileName[MAX_FILENAME_SIZE], line[MAX_STR];
     int fileSize, bytesRead, offset;
     
-    bytesRead = read(tcpfd, buffer, MAX_STR);
+    if(receiveTCP(MAX_STR, &bytesRead)==-1)
+        return;
 
     sscanf(buffer, "%s %d\n%n", fileName, &fileSize, &offset);
 
@@ -293,7 +301,7 @@ void state() {
     hints.ai_family=AF_INET; //IPv4
     hints.ai_socktype=SOCK_STREAM;
 
-    errcode = getaddrinfo(HOSTNAME, PORT, &hints, &tcpRes);
+    errcode = getaddrinfo(gsip, gsport, &hints, &tcpRes);
     if(errcode!=0)/*error*/exit(1);
 
     connect(tcpfd, tcpRes->ai_addr, tcpRes->ai_addrlen);
@@ -323,9 +331,10 @@ void state() {
 
 void receiveAndDisplay() {
     char word[MAX_WORD_SIZE], status[10], fileName[MAX_FILENAME_SIZE];
-    int fileSize, offset;
+    int fileSize, offset, readBytes;
 
-    int readBytes = read(tcpfd, buffer, MAX_STR);
+    if(receiveTCP(MAX_STR, &readBytes)==-1)
+        return;
     sscanf(buffer, "%s %d%n", fileName, &fileSize, &offset);
 
     FILE* f = fopen(fileName, "w");
@@ -381,6 +390,8 @@ void guess_word() {
 
     if(receiveUDP(buffer) == -1)
         return;
+    
+    printf("'%s'\n", buffer);
 
     char status[COMMAND_SIZE];
     sscanf(buffer, "RWG %s %*s", status);
@@ -503,7 +514,7 @@ int receiveTCP(int amount, int *amountRead) {
     if(amountRead == NULL)
         read(tcpfd, buffer, amount);
     else
-        amountRead = read(tcpfd, buffer, amount);
+        *amountRead = read(tcpfd, buffer, amount);
     return 0;
 }
 
@@ -520,8 +531,8 @@ int hash(char* arg) {
 
 void init(int argc, char **argv) {
     // Initialize GSport to hostname in case one wasn't provided
-    strcpy(gsport, PORT);
-    gethostname(hostname, MAX_HOSTNAME_SIZE);
+    strcpy(gsport, DEFAULT_PORT);
+    gethostname(gsip, MAX_HOSTNAME_SIZE);
 
     if (argc < 3)
         return;

@@ -1,5 +1,0 @@
-Last game for player 099321 found. Word was chlorobenzylidenemalononitrile and hint was 2D-struct.png
---------------------------------
-	 0 - 	LETTER:	c	FOUND:	1	
-	 1 - 	WORD:	chlorobenzylidenemalononitrile	SUCCESS	
---------------------------------

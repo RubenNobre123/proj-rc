@@ -1,0 +1,5 @@
+Last game for player 100003 found. Word was abracadabra and hint was witch.jpg
+--------------------------------
+	 0 - 	LETTER:	a	FOUND:	5	
+	 1 - 	WORD:	abracadabra	SUCCESS	
+--------------------------------

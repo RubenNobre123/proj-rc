@@ -1,5 +1,0 @@
-Active game for player 918231 found:
---------------------------------
-	 0 - 	LETTER:	a	FOUND:	5	
-	 1 - 	LETTER:	b	FOUND:	2	
---------------------------------

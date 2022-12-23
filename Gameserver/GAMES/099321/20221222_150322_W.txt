@@ -1,4 +1,0 @@
-chlorobenzylidenemalononitrile 2D-struct.png
-T c 1
-G chlorobenzylidenemalononitrile
-WIN
