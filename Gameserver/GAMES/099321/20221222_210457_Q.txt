@@ -1,4 +1,0 @@
-barracuda esox_sphyraena.jpg
-G barracuda
-WIN
-QUIT

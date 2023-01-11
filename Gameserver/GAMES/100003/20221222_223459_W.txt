@@ -1,4 +1,0 @@
-abracadabra witch.jpg
-T a 5
-G abracadabra
-WIN

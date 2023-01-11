@@ -178,7 +178,7 @@ void scoreboard() {
 
     write(tcpfd, message, offset);
 
-    if(receiveTCP(8, NULL) == -1)
+    if(receiveTCP(9, NULL) == -1)
         return;
 
     sscanf(buffer, "RSB %s", status);
@@ -391,8 +391,6 @@ void guess_word() {
     if(receiveUDP(buffer) == -1)
         return;
     
-    printf("'%s'\n", buffer);
-
     char status[COMMAND_SIZE];
     sscanf(buffer, "RWG %s %*s", status);
 

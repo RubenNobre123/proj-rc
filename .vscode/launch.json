@@ -6,12 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/player",
-            "args": [
-                "-n",
-                "tejo.tecnico.ulisboa.pt",
-                "-p",
-                "58011"
-            ],
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
@@ -55,10 +50,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Gameserver/GS",
             "args": [
-                "word_eng.txt",
-                "-p",
-                "58037",
-                "-v"
+                "word_eng.txt"
             ],
             "stopAtEntry": true,
             "cwd": "${fileDirname}",

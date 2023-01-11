@@ -62,7 +62,7 @@ int getArguments( char* args, char* plid, char *path);
 int playLetter(char* gamePath, char letter, int userTrial, char* content, int* stat, int* positions) ;
 void guessWord(char* gamePath, char* wordGuessed, int userTrial, char* content, int* stat);
 void createScore(char* gamePath, char* plid);
-int createScoreboard(char* scoreboardPath, int nFiles);
+int createScoreboard(char* scoreboardPath, int n_entries, struct dirent **entries);
 long getFileSize(char* file);
 long createStateFile(char* path, char* statePath, char* plid, char* buffer, enum status stat);
 int findLastGame(char* PLID, char* fname);

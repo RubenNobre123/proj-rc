@@ -101,19 +101,19 @@ int main(int argc, char** argv){
             strncpy(command, request, COMMAND_SIZE);
             command[COMMAND_SIZE-1] = '\0';
 
-            childpid = fork();
-            if (childpid == 0) {
+            /*childpid = fork();
+            if (childpid == 0) {*/
                 switch(hash(command)) {
                     case(REQUEST_GSB): gsb(); break;
                     case(REQUEST_GHL): ghl(request+COMMAND_SIZE); break;
                     case(REQUEST_STA): sta(request+COMMAND_SIZE); break;
                     default: UNKOWN_MESSAGE(command); break;
                 }
-                close(connfd);
+                /*close(connfd);
                 close(tcpfd);
                 close(udpfd);
                 exit(0);
-            }
+            }*/
             close(connfd);
         }
     }
@@ -328,26 +328,18 @@ void gsb() {
         printf("Received %s request from IP %s and port %s with PLID %s.\n", "SNG", inet_ntoa(addr.sin_addr), gsport, "N/A");
     }
 
-    DIR* dir = opendir(GAMES_DIRECTORY);
-    // Start reading scoreDir and count how many files are in it
-    struct dirent* entry;
-    int nFiles = 0;
-    while((entry = readdir(dir))) {
-        if(entry->d_type == DT_REG) {
-            nFiles++;
-        }
-    }
-    closedir(dir);
+    int offset;
 
-    stat = nFiles == 0 ? EMPTY : OK;
-
-    sprintf(reply, "RSB %s\n", statusToString(stat));
-    write(connfd, reply, MAX_STR);
+    int n_entries;
+    struct dirent **entries;
+    n_entries = scandir("./SCORES/", &entries, NULL, alphasort);
+    stat = n_entries-2 == 0 ? EMPTY : OK;
+    sprintf(reply, "RSB %s\n%n", statusToString(stat), &offset);
 
     if(stat==OK) {
-        long bytes = createScoreboard(scoreboardPath, nFiles);
+        long bytes = createScoreboard(scoreboardPath, n_entries, entries);
         FILE* sb = fopen(scoreboardPath, "r");
-        int offset, readBytes, bytesRead;
+        int readBytes, bytesRead;
 
         sprintf(reply, "%s %ld\n%n", "scoreboard.txt", bytes, &offset);
         write(connfd, reply, offset);
@@ -359,25 +351,18 @@ void gsb() {
 
         fclose(sb);
     }
-    else {
-        strcat(reply, "\n");
-        write(connfd, reply, MAX_STR);
-    }
 }
 
-int createScoreboard(char* scoreboardPath, int nFiles) {
+int createScoreboard(char* scoreboardPath, int n_entries, struct dirent **entries) {
     char fname[MAX_STR*2];
     int written = 0;
-    struct dirent **entries;
     FILE* fp;
-    int n_entries;
 
     sprintf(scoreboardPath, "%s/scoreboard.txt", GAMES_DIRECTORY);
 
     // Create scoreboard file
     FILE* scoreboard = fopen(scoreboardPath, "w");
 
-    n_entries = scandir("./SCORES/", &entries, NULL, alphasort);
     if(n_entries < 0) return 0;
     while (n_entries--) {
         if(entries[n_entries]->d_name[0] != '.') {
@@ -814,6 +799,7 @@ void init(int argc, char** argv) {
     }
     signal(SIGKILL, sigHandler);
 
+    strcpy(gsport, DEFAULT_PORT);
 
     if(argc < 2) {
         printf("Usage: %s <words_file> [-p <port>] [-v]\n", argv[0]);
